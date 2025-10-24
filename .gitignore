@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Arquivos de configuração e chaves secretas
+src/firebaseConfig.js
