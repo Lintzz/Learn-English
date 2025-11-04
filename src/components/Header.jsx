@@ -1,8 +1,51 @@
+// src/components/Header.jsx (MODIFICADO)
+
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { auth } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
+
+function getHojeString() {
+  return new Date().toISOString().split("T")[0];
+}
+function getOntemString() {
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+  return ontem.toISOString().split("T")[0];
+}
 
 export function Header({ user }) {
+  const [userData, setUserData] = useState({ streak: 0 });
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+
+    if (user) {
+      const userDocRef = doc(db, "usuarios", user.uid);
+
+      unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const dados = docSnap.data();
+          const hoje = getHojeString();
+          const ontem = getOntemString();
+
+          if (dados.lastStudyDay && dados.lastStudyDay < ontem) {
+            setUserData({ ...dados, streak: 0 });
+          } else {
+            setUserData(dados);
+          }
+        } else {
+          setUserData({ streak: 0 });
+        }
+      });
+    } else {
+      setUserData({ streak: 0 });
+    }
+
+    return () => unsubscribe();
+  }, [user]);
+
   async function handleLogin() {
     const provider = new GoogleAuthProvider();
     try {
@@ -29,24 +72,32 @@ export function Header({ user }) {
 
         {user && (
           <nav className="flex space-x-4">
+            {/* --- NAVEGAÇÃO PRINCIPAL MOVIDA PARA CÁ --- */}
             <Link
-              to="/estudar-palavras"
+              to="/diarias"
               className="text-zinc-300 hover:text-emerald-500"
             >
-              Estudar Palavras
+              Desafio Diário
             </Link>
             <Link
-              to="/estudar-frases"
+              to="/meu-deck"
               className="text-zinc-300 hover:text-emerald-500"
             >
-              Estudar Frases
+              Meu Deck
             </Link>
             <Link
-              to="/praticar-escrita"
+              to="/decks-tematicos"
               className="text-zinc-300 hover:text-emerald-500"
             >
-              Praticar Escrita
+              Decks Temáticos
             </Link>
+            <Link
+              to="/progresso"
+              className="text-zinc-300 hover:text-emerald-500"
+            >
+              Meu Progresso
+            </Link>
+            {/* --- FIM DA NAVEGAÇÃO --- */}
           </nav>
         )}
       </div>
@@ -54,6 +105,11 @@ export function Header({ user }) {
       <div>
         {user ? (
           <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-1 text-lg text-orange-400">
+              <span>🔥</span>
+              <span className="font-bold">{userData.streak || 0}</span>
+            </div>
+
             <img
               src={user.photoURL}
               alt={user.displayName}
