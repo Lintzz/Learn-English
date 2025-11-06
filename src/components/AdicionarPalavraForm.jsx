@@ -1,15 +1,17 @@
-// src/components/AdicionarPalavraForm.jsx
-
 import { useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { db } from "../firebaseConfig";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-export function AdicionarPalavraForm({ userId }) {
-  const [tipo, setTipo] = useState("palavra"); // 'palavra' ou 'frase'
+export function AdicionarPalavraForm() {
+  const { user } = useOutletContext();
+  const userId = user?.uid;
+
+  const [tipo, setTipo] = useState("palavra");
   const [ingles, setIngles] = useState("");
   const [portugues, setPortugues] = useState("");
-  const [palavraChave, setPalavraChave] = useState(""); // Só para frases
-  const [status, setStatus] = useState("neutro"); // 'neutro', 'salvando', 'sucesso', 'erro'
+  const [palavraChave, setPalavraChave] = useState("");
+  const [status, setStatus] = useState("neutro");
 
   async function handleSubmit(e) {
     e.preventDefault();

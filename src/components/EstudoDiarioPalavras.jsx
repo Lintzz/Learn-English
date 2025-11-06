@@ -1,8 +1,5 @@
-// src/components/EstudoDiarioPalavras.jsx (MODIFICADO)
-
 import { useState, useEffect } from "react";
 import { db } from "../firebaseConfig";
-// ... (imports inalterados)
 import {
   collection,
   getDocs,
@@ -15,31 +12,19 @@ import {
   orderBy,
 } from "firebase/firestore";
 
-// --- FUNÇÕES AJUDANTES (sem mudanças) ---
-function getHojeString() {
-  return new Date().toISOString().split("T")[0];
-}
-function getOntemString() {
-  const ontem = new Date();
-  ontem.setDate(ontem.getDate() - 1);
-  return ontem.toISOString().split("T")[0];
-}
-function shuffleArray(array) {
-  let newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-}
-// --- FIM FUNÇÕES AJUDANTES ---
+import { useOutletContext } from "react-router-dom";
+import { getHojeString, getOntemString, shuffleArray } from "../utils/helpers";
 
-export function EstudoDiarioPalavras({ userId }) {
+export function EstudoDiarioPalavras() {
+  const { user } = useOutletContext();
+  const userId = user?.uid;
+
   const [deck, setDeck] = useState([]);
   const [status, setStatus] = useState("loading");
   const [indiceAtual, setIndiceAtual] = useState(0);
 
-  // ... (outros estados inalterados)
+  const [modo, setModo] = useState("estudar");
+
   const [opcoes, setOpcoes] = useState([]);
   const [respostaSelecionada, setRespostaSelecionada] = useState(null);
   const [acertouSelecao, setAcertouSelecao] = useState(false);
@@ -51,21 +36,16 @@ export function EstudoDiarioPalavras({ userId }) {
   const [sessaoConcluida, setSessaoConcluida] = useState(false);
   const [verRevisao, setVerRevisao] = useState(false);
 
-  // --- NOVO ESTADO GATILHO ---
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
-  // EFEITO 1: Carga do Deck (MODIFICADO para depender do reloadTrigger)
   useEffect(() => {
     async function carregarEstudo() {
       if (!userId) {
         setStatus("deck_empty");
         return;
       }
-
       setStatus("loading");
-
       try {
-        // 1. VERIFICAR TENTATIVAS
         const hoje = getHojeString();
         const historicoRef = doc(
           db,
@@ -82,8 +62,6 @@ export function EstudoDiarioPalavras({ userId }) {
           return;
         }
 
-        // 2. Carregar Deck (se não estiver limitado)
-        // ... (resto da lógica de carregar o deck inalterada)
         const userDocRef = doc(db, "usuarios", userId);
         const userSnap = await getDoc(userDocRef);
         const studyDay = userSnap.data()?.studyDay || 1;
@@ -111,15 +89,12 @@ export function EstudoDiarioPalavras({ userId }) {
         setStatus("deck_empty");
       }
     }
-
     carregarEstudo();
-  }, [userId, reloadTrigger]); // <-- DEPENDÊNCIA ADICIONADA
+  }, [userId, reloadTrigger]);
 
-  // EFEITO 2: Prepara a tela para a palavra atual (sem mudanças)
   useEffect(() => {
     if (status !== "ready" || deck.length === 0 || indiceAtual >= deck.length)
       return;
-    // ... (resto da função sem mudanças)
     setRespostaSelecionada(null);
     setAcertouSelecao(false);
     setEscritaInput("");
@@ -137,9 +112,7 @@ export function EstudoDiarioPalavras({ userId }) {
     setOpcoes(shuffleArray(novasOpcoes));
   }, [status, deck, indiceAtual]);
 
-  // FUNÇÃO: Atualiza Streak e "studyDay" (sem mudanças)
   async function atualizarStreakEProgresso(userId) {
-    // ... (código idêntico)
     const userDocRef = doc(db, "usuarios", userId);
     const hoje = getHojeString();
     try {
@@ -174,9 +147,7 @@ export function EstudoDiarioPalavras({ userId }) {
     }
   }
 
-  // FUNÇÃO: Salva progresso diário (sem mudanças)
   async function salvarProgressoDiario(placarFinal) {
-    // ... (código idêntico)
     if (!userId) return;
     const hoje = new Date().toISOString().split("T")[0];
     const docRef = doc(db, "usuarios", userId, "historicoDiario", hoje);
@@ -199,7 +170,6 @@ export function EstudoDiarioPalavras({ userId }) {
     }
   }
 
-  // FUNÇÃO: Reseta a sessão (MODIFICADA)
   function reiniciarSessao() {
     setDeck([]);
     setIndiceAtual(0);
@@ -214,20 +184,17 @@ export function EstudoDiarioPalavras({ userId }) {
     setSessaoConcluida(false);
     setVerRevisao(false);
     setStatus("loading");
-    // --- ATIVA O GATILHO ---
+    setModo("estudar");
     setReloadTrigger((prev) => prev + 1);
   }
 
-  // --- Funções de Interação (sem mudanças) ---
   function handleFalar(texto) {
-    // ... (código idêntico)
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(texto);
     utterance.lang = "en-US";
     window.speechSynthesis.speak(utterance);
   }
   function handleVerificarSelecao(opcaoClicada) {
-    // ... (código idêntico)
     if (acertouSelecao) return;
     setRespostaSelecionada(opcaoClicada);
     const respostaCorreta = deck[indiceAtual].palavra_pt;
@@ -238,7 +205,6 @@ export function EstudoDiarioPalavras({ userId }) {
     }
   }
   function handleVerificarEscrita() {
-    // ... (código idêntico)
     const respostaLimpa = escritaInput.trim().toLowerCase();
     const respostaCorreta = deck[indiceAtual].palavra_en.trim().toLowerCase();
     const acertou = respostaLimpa === respostaCorreta;
@@ -255,27 +221,21 @@ export function EstudoDiarioPalavras({ userId }) {
     if (indiceAtual + 1 === deck.length) {
       setSessaoConcluida(true);
       const placarFinal =
-        acertosSessao + (acertou && errosNaPalavra === 0 ? 1 : 0);
+        acertosSessao +
+        (acertou && errosNaPalavra === 0 && !acertouEscrita ? 1 : 0);
       salvarProgressoDiario(placarFinal);
     }
   }
   function irParaProxima() {
-    // ... (código idêntico)
     if (indiceAtual + 1 < deck.length) {
       setIndiceAtual(indiceAtual + 1);
     }
   }
   function irParaAnterior() {
-    // ... (código idêntico)
     if (indiceAtual > 0) {
       setIndiceAtual(indiceAtual - 1);
     }
   }
-
-  // --- RENDERIZAÇÃO (sem mudanças) ---
-  // A lógica de renderização anterior já está correta.
-  // O `status` 'limited' será ativado pelo `useEffect`
-  // após `reiniciarSessao` disparar o `reloadTrigger`.
 
   if (status === "loading") {
     return (
@@ -317,7 +277,6 @@ export function EstudoDiarioPalavras({ userId }) {
       <div className="w-full max-w-md text-center text-white">
         <div className="rounded-lg bg-zinc-800 p-8 shadow-lg">
           {verRevisao ? (
-            // ... (tela de revisão inalterada)
             <div>
               <h2 className="text-2xl font-bold text-emerald-500">
                 Revisão da Sessão
@@ -342,7 +301,6 @@ export function EstudoDiarioPalavras({ userId }) {
               </button>
             </div>
           ) : (
-            // ... (tela de parabéns inalterada)
             <div>
               <h2 className="text-3xl font-bold text-emerald-500">Parabéns!</h2>
               <p className="mt-4 text-xl text-zinc-300">
@@ -381,7 +339,37 @@ export function EstudoDiarioPalavras({ userId }) {
   }
 
   if (status === "ready") {
-    // ... (renderização do quiz inalterada)
+    if (modo === "estudar") {
+      return (
+        <div className="w-full max-w-md text-center text-white animate-fadeIn">
+          <div className="rounded-lg bg-zinc-800 p-8 shadow-lg">
+            <h2 className="text-2xl font-bold text-emerald-500">
+              Estude as Palavras de Hoje
+            </h2>
+            <p className="mt-2 text-zinc-400">
+              Memorize a lista abaixo antes de começar o teste.
+            </p>
+            <ul className="mt-4 max-h-80 overflow-y-auto text-left divide-y divide-zinc-700">
+              {deck.map((palavra) => (
+                <li key={palavra.id} className="py-2">
+                  <span className="font-bold text-white">
+                    {palavra.palavra_en}
+                  </span>
+                  <span className="text-zinc-400">: {palavra.palavra_pt}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => setModo("quiz")}
+              className="mt-6 w-full rounded-lg bg-emerald-600 px-6 py-3 text-lg text-white transition-colors hover:bg-emerald-500"
+            >
+              Começar o Quiz!
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     const palavraAtual = deck[indiceAtual];
     const totalPalavras = deck.length;
     let corBordaInput = "border-zinc-700 focus:border-emerald-500";

@@ -1,5 +1,3 @@
-// src/components/EstudoPessoalFrases.jsx
-
 import { useState, useEffect } from "react";
 import { db } from "../firebaseConfig";
 import {
@@ -7,31 +5,18 @@ import {
   getDocs,
   doc,
   setDoc,
-  // getDoc, // Não é mais necessário para streak
   serverTimestamp,
-  // query, // Não é mais necessário
   Timestamp,
 } from "firebase/firestore";
 
-// --- FUNÇÕES AJUDANTES ---
-function shuffleArray(array) {
-  let newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-}
-const srsNiveis = [0, 1, 3, 7, 14, 30, 60];
-function getProximaRevisao(nivel) {
-  const diasParaAdicionar = srsNiveis[nivel] || 0;
-  const data = new Date();
-  data.setDate(data.getDate() + diasParaAdicionar);
-  return Timestamp.fromDate(data);
-}
-// --- FIM FUNÇÕES AJUDANTES ---
+import { useOutletContext } from "react-router-dom";
+import { shuffleArray } from "../utils/helpers";
+import { getProximaRevisao, calcularNovoNivel } from "../utils/srs";
 
-export function EstudoPessoalFrases({ userId }) {
+export function EstudoPessoalFrases() {
+  const { user } = useOutletContext();
+  const userId = user?.uid;
+
   const [deckEstudo, setDeckEstudo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [indiceAtual, setIndiceAtual] = useState(0);
@@ -44,14 +29,12 @@ export function EstudoPessoalFrases({ userId }) {
   const [acertosSessao, setAcertosSessao] = useState(0);
   const [errosNaFrase, setErrosNaFrase] = useState(0);
 
-  // EFEITO 1: Carregar Deck de Estudo (SRS Pessoal)
   useEffect(() => {
     async function carregarDeckDeEstudo() {
       if (!userId) return;
       setLoading(true);
 
       try {
-        // 1. Carregar Deck Pessoal de Frases
         const pessoalRef = collection(db, "usuarios", userId, "frases");
         const pessoalSnap = await getDocs(pessoalRef);
         const deckPessoal = pessoalSnap.docs.map((doc) => ({
@@ -59,7 +42,6 @@ export function EstudoPessoalFrases({ userId }) {
           ...doc.data(),
         }));
 
-        // 2. Carregar progresso de FRASES
         const progressoRef = collection(
           db,
           "usuarios",
@@ -72,7 +54,6 @@ export function EstudoPessoalFrases({ userId }) {
           progressoMap.set(doc.id, doc.data());
         });
 
-        // 3. FILTRAR
         const hoje = new Date();
         let frasesNovas = [];
         let frasesParaRevisar = [];
@@ -86,7 +67,6 @@ export function EstudoPessoalFrases({ userId }) {
           }
         }
 
-        // 4. Criar Deck de Hoje (Todas para revisar + 5 novas)
         const NOVAS_POR_DIA = 5;
         let deckFinal = [
           ...shuffleArray(frasesParaRevisar),
@@ -105,7 +85,6 @@ export function EstudoPessoalFrases({ userId }) {
     carregarDeckDeEstudo();
   }, [userId]);
 
-  // EFEITO 2: Prepara a tela
   useEffect(() => {
     if (deckEstudo.length === 0 || indiceAtual >= deckEstudo.length) return;
     setEscritaInput("");
@@ -114,25 +93,13 @@ export function EstudoPessoalFrases({ userId }) {
     setErrosNaFrase(0);
   }, [deckEstudo, indiceAtual]);
 
-  // FUNÇÃO: Salvar Progresso SRS
   async function salvarProgressoSRS(acertou) {
     if (!userId) return;
-
-    // A streak não é atualizada aqui, apenas no modo "Diário"
-    // if (indiceAtual === 0 && acertou) {
-    //   atualizarStreak();
-    // }
 
     const frase = deckEstudo[indiceAtual];
     const progressoAtual = frase.progresso || { nivel: 0 };
 
-    let novoNivel = progressoAtual.nivel;
-    if (acertou) {
-      novoNivel = Math.min(novoNivel + 1, srsNiveis.length - 1);
-    } else {
-      novoNivel = Math.max(novoNivel - 1, 1);
-    }
-
+    const novoNivel = calcularNovoNivel(progressoAtual.nivel, acertou);
     const proximaRevisao = getProximaRevisao(novoNivel);
     const docRef = doc(db, "usuarios", userId, "progressoFrases", frase.id);
     try {
@@ -151,7 +118,6 @@ export function EstudoPessoalFrases({ userId }) {
     }
   }
 
-  // FUNÇÃO: Fala a frase
   function handleFalar(texto) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(texto);
@@ -159,7 +125,6 @@ export function EstudoPessoalFrases({ userId }) {
     window.speechSynthesis.speak(utterance);
   }
 
-  // FUNÇÃO: Verifica a palavra digitada
   function handleVerificarEscrita() {
     const respostaLimpa = escritaInput.trim().toLowerCase();
     const respostaCorreta = deckEstudo[indiceAtual].palavra_chave
@@ -185,14 +150,11 @@ export function EstudoPessoalFrases({ userId }) {
     }
   }
 
-  // FUNÇÃO: Avança para a próxima frase
   function irParaProxima() {
     if (indiceAtual + 1 < deckEstudo.length) {
       setIndiceAtual(indiceAtual + 1);
     }
   }
-
-  // --- RENDERIZAÇÃO ---
 
   if (loading) {
     return (
@@ -244,11 +206,9 @@ export function EstudoPessoalFrases({ userId }) {
     );
   }
 
-  // Renderização do Quiz
   const fraseAtual = deckEstudo[indiceAtual];
   const totalFrases = deckEstudo.length;
 
-  // Fallback se 'palavra_chave' não existir
   const palavraChave = fraseAtual.palavra_chave || "ERROR";
 
   const regexPalavra = new RegExp(palavraChave, "i");

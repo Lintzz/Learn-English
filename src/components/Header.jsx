@@ -1,5 +1,3 @@
-// src/components/Header.jsx (MODIFICADO)
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { auth, db } from "../firebaseConfig";
@@ -72,7 +70,6 @@ export function Header({ user }) {
 
         {user && (
           <nav className="flex space-x-4">
-            {/* --- NAVEGAÇÃO PRINCIPAL MOVIDA PARA CÁ --- */}
             <Link
               to="/diarias"
               className="text-zinc-300 hover:text-emerald-500"
@@ -91,13 +88,6 @@ export function Header({ user }) {
             >
               Decks Temáticos
             </Link>
-            <Link
-              to="/progresso"
-              className="text-zinc-300 hover:text-emerald-500"
-            >
-              Meu Progresso
-            </Link>
-            {/* --- FIM DA NAVEGAÇÃO --- */}
           </nav>
         )}
       </div>

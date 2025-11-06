@@ -25,3 +25,9 @@ dist-ssr
 
 # Arquivos de configuração e chaves secretas
 src/firebaseConfig.js
+
+# Arquivos de ambiente
+.env
+
+# Chave de admin do Firebase
+serviceAccountKey.json

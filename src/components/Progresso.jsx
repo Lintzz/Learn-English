@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { db } from "../firebaseConfig";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 
-export function Progresso({ userId }) {
+export function Progresso() {
+  const { user } = useOutletContext();
+  const userId = user?.uid;
+
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalPalavras, setTotalPalavras] = useState(0);
@@ -12,7 +16,6 @@ export function Progresso({ userId }) {
     async function buscarHistorico() {
       if (!userId) return;
       try {
-        // 1. Cria a referência para a subcoleção
         const historicoRef = collection(
           db,
           "usuarios",
@@ -20,8 +23,6 @@ export function Progresso({ userId }) {
           "historicoDiario"
         );
 
-        // 2. Cria a query: ordenar por data, da mais nova para a mais antiga
-        //    Vamos pegar os últimos 30 dias de estudo
         const q = query(historicoRef, orderBy("data", "desc"), limit(30));
 
         const querySnapshot = await getDocs(q);
@@ -33,10 +34,9 @@ export function Progresso({ userId }) {
         querySnapshot.forEach((doc) => {
           const dados = doc.data();
           listaHistorico.push({
-            id: doc.id, // O id será a data "AAAA-MM-DD"
+            id: doc.id,
             ...dados,
           });
-          // 3. Calcula o total de todos os tempos
           totalP += dados.acertosPalavras || 0;
           totalF += dados.acertosFrases || 0;
         });
@@ -52,7 +52,7 @@ export function Progresso({ userId }) {
     }
 
     buscarHistorico();
-  }, [userId]); // Roda quando o userId estiver disponível
+  }, [userId]);
 
   if (loading) {
     return <p className="text-2xl text-white">Carregando progresso...</p>;

@@ -1,8 +1,5 @@
-// src/components/EstudoDiarioFrases.jsx (MODIFICADO)
-
 import { useState, useEffect } from "react";
 import { db } from "../firebaseConfig";
-// ... (imports inalterados)
 import {
   collection,
   getDocs,
@@ -15,31 +12,17 @@ import {
   orderBy,
 } from "firebase/firestore";
 
-// --- FUNÇÕES AJUDANTES (sem mudanças) ---
-function getHojeString() {
-  return new Date().toISOString().split("T")[0];
-}
-function getOntemString() {
-  const ontem = new Date();
-  ontem.setDate(ontem.getDate() - 1);
-  return ontem.toISOString().split("T")[0];
-}
-function shuffleArray(array) {
-  let newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-}
-// --- FIM FUNÇÕES AJUDANTES ---
+import { useOutletContext } from "react-router-dom";
+import { getHojeString, getOntemString, shuffleArray } from "../utils/helpers";
 
-export function EstudoDiarioFrases({ userId }) {
+export function EstudoDiarioFrases() {
+  const { user } = useOutletContext();
+  const userId = user?.uid;
+
   const [deckEstudo, setDeckEstudo] = useState([]);
   const [status, setStatus] = useState("loading");
   const [indiceAtual, setIndiceAtual] = useState(0);
 
-  // ... (outros estados inalterados)
   const [escritaInput, setEscritaInput] = useState("");
   const [feedback, setFeedback] = useState("neutro");
   const [acertou, setAcertou] = useState(false);
@@ -47,18 +30,15 @@ export function EstudoDiarioFrases({ userId }) {
   const [acertosSessao, setAcertosSessao] = useState(0);
   const [errosNaFrase, setErrosNaFrase] = useState(0);
 
-  // --- NOVOS ESTADOS ADICIONADOS ---
   const [verRevisao, setVerRevisao] = useState(false);
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
-  // EFEITO 1: Carregar Deck de Estudo (MODIFICADO para reloadTrigger)
   useEffect(() => {
     async function carregarDeckDeEstudo() {
       if (!userId) return;
       setStatus("loading");
 
       try {
-        // 1. VERIFICAR TENTATIVAS
         const hoje = getHojeString();
         const historicoRef = doc(
           db,
@@ -68,7 +48,6 @@ export function EstudoDiarioFrases({ userId }) {
           hoje
         );
         const historicoSnap = await getDoc(historicoRef);
-        // Usamos 'tentativasFrases' aqui
         const tentativas = historicoSnap.data()?.tentativasFrases || 0;
 
         if (tentativas >= 2) {
@@ -76,8 +55,6 @@ export function EstudoDiarioFrases({ userId }) {
           return;
         }
 
-        // 2. Carregar Deck (se não limitado)
-        // ... (resto da lógica de carregar o deck inalterada)
         const userDocRef = doc(db, "usuarios", userId);
         const userSnap = await getDoc(userDocRef);
         const studyDay = userSnap.data()?.studyDay || 1;
@@ -103,11 +80,9 @@ export function EstudoDiarioFrases({ userId }) {
       }
     }
     carregarDeckDeEstudo();
-  }, [userId, reloadTrigger]); // <-- DEPENDÊNCIA ADICIONADA
+  }, [userId, reloadTrigger]);
 
-  // EFEITO 2: Prepara a tela (sem mudanças)
   useEffect(() => {
-    // ... (código idêntico)
     if (deckEstudo.length === 0 || indiceAtual >= deckEstudo.length) return;
     setEscritaInput("");
     setFeedback("neutro");
@@ -115,9 +90,7 @@ export function EstudoDiarioFrases({ userId }) {
     setErrosNaFrase(0);
   }, [deckEstudo, indiceAtual]);
 
-  // FUNÇÃO: Atualiza Streak e "studyDay" (sem mudanças)
   async function atualizarStreakEProgresso(userId) {
-    // ... (código idêntico)
     const userDocRef = doc(db, "usuarios", userId);
     const hoje = getHojeString();
     try {
@@ -152,9 +125,7 @@ export function EstudoDiarioFrases({ userId }) {
     }
   }
 
-  // FUNÇÃO: Salva progresso diário (sem mudanças)
   async function salvarProgressoDiario(placarFinal) {
-    // ... (código idêntico)
     if (!userId) return;
     const hoje = new Date().toISOString().split("T")[0];
     const docRef = doc(db, "usuarios", userId, "historicoDiario", hoje);
@@ -177,7 +148,6 @@ export function EstudoDiarioFrases({ userId }) {
     }
   }
 
-  // --- NOVA FUNÇÃO ---
   function reiniciarSessao() {
     setDeckEstudo([]);
     setIndiceAtual(0);
@@ -192,18 +162,14 @@ export function EstudoDiarioFrases({ userId }) {
     setReloadTrigger((prev) => prev + 1);
   }
 
-  // FUNÇÃO: Fala a frase (sem mudanças)
   function handleFalar(texto) {
-    // ... (código idêntico)
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(texto);
     utterance.lang = "en-US";
     window.speechSynthesis.speak(utterance);
   }
 
-  // FUNÇÃO: Verifica a palavra digitada (sem mudanças)
   function handleVerificarEscrita() {
-    // ... (código idêntico)
     const respostaLimpa = escritaInput.trim().toLowerCase();
     const respostaCorreta = deckEstudo[indiceAtual].palavra_chave
       .trim()
@@ -227,15 +193,11 @@ export function EstudoDiarioFrases({ userId }) {
     }
   }
 
-  // FUNÇÃO: Avança para a próxima frase (sem mudanças)
   function irParaProxima() {
-    // ... (código idêntico)
     if (indiceAtual + 1 < deckEstudo.length) {
       setIndiceAtual(indiceAtual + 1);
     }
   }
-
-  // --- RENDERIZAÇÃO (MODIFICADA) ---
 
   if (status === "loading") {
     return (
@@ -273,13 +235,11 @@ export function EstudoDiarioFrases({ userId }) {
     );
   }
 
-  // TELA DE CONCLUSÃO (MODIFICADA)
   if (sessaoConcluida) {
     return (
       <div className="w-full max-w-md text-center text-white">
         <div className="rounded-lg bg-zinc-800 p-8 shadow-lg">
           {verRevisao ? (
-            // --- TELA DE REVISÃO ---
             <div>
               <h2 className="text-2xl font-bold text-emerald-500">
                 Revisão da Sessão
@@ -302,7 +262,6 @@ export function EstudoDiarioFrases({ userId }) {
               </button>
             </div>
           ) : (
-            // --- TELA DE PARABÉNS ---
             <div>
               <h2 className="text-3xl font-bold text-emerald-500">
                 Sessão Concluída!
@@ -342,9 +301,7 @@ export function EstudoDiarioFrases({ userId }) {
     );
   }
 
-  // Renderização do Quiz
   if (status === "ready" && !sessaoConcluida) {
-    // ... (renderização do quiz inalterada)
     const fraseAtual = deckEstudo[indiceAtual];
     const totalFrases = deckEstudo.length;
     const palavraChave = fraseAtual.palavra_chave || "ERROR";

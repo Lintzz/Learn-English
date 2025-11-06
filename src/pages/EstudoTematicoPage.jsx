@@ -1,16 +1,17 @@
 import { Link } from "react-router-dom";
-import { EstudoDiarioPalavras } from "../components/EstudoDiarioPalavras";
+import { EstudoTematico } from "../components/EstudoTematico";
 
-export function EstudoDiarioPalavrasPage() {
+export function EstudoTematicoPage() {
   return (
     <div className="w-full max-w-md">
       <Link
-        to="/diarias"
+        to="/decks-tematicos"
         className="mb-4 inline-block text-zinc-400 hover:text-emerald-500"
       >
-        &larr; Voltar para Desafios Diários
+        &larr; Voltar para Decks Temáticos
       </Link>
-      <EstudoDiarioPalavras />
+
+      <EstudoTematico />
     </div>
   );
 }

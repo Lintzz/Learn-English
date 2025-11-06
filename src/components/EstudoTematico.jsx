@@ -1,23 +1,15 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { db } from "../firebaseConfig";
-import {
-  collection,
-  getDocs,
-  doc,
-  setDoc,
-  serverTimestamp,
-  Timestamp,
-} from "firebase/firestore";
-
-import { useOutletContext } from "react-router-dom";
+import { collection, getDocs, query } from "firebase/firestore";
 import { shuffleArray } from "../utils/helpers";
-import { getProximaRevisao, calcularNovoNivel } from "../utils/srs";
 
-export function EstudoPessoalPalavras() {
-  const { user } = useOutletContext();
-  const userId = user?.uid;
+export function EstudoTematico() {
+  const { themeId } = useParams();
+
   const [deck, setDeck] = useState([]);
-  const [studyStatus, setStudyStatus] = useState("loading");
+  const [deckNome, setDeckNome] = useState("");
+  const [status, setStatus] = useState("loading");
   const [indiceAtual, setIndiceAtual] = useState(0);
 
   const [modo, setModo] = useState("estudar");
@@ -25,80 +17,50 @@ export function EstudoPessoalPalavras() {
   const [opcoes, setOpcoes] = useState([]);
   const [respostaSelecionada, setRespostaSelecionada] = useState(null);
   const [acertouSelecao, setAcertouSelecao] = useState(false);
-
   const [escritaInput, setEscritaInput] = useState("");
   const [escritaFeedback, setEscritaFeedback] = useState("neutro");
   const [acertouEscrita, setAcertouEscrita] = useState(false);
-
   const [errosNaPalavra, setErrosNaPalavra] = useState(0);
   const [acertosSessao, setAcertosSessao] = useState(0);
   const [sessaoConcluida, setSessaoConcluida] = useState(false);
+  const [verRevisao, setVerRevisao] = useState(false);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
 
   useEffect(() => {
-    async function carregarDeckDeEstudo() {
-      if (!userId) return;
-      setStudyStatus("loading");
+    async function carregarEstudo() {
+      if (!themeId) {
+        setStatus("deck_empty");
+        return;
+      }
+      setStatus("loading");
       setModo("estudar");
 
       try {
-        const pessoalRef = collection(db, "usuarios", userId, "palavras");
-        const pessoalSnap = await getDocs(pessoalRef);
-        const deckPessoal = pessoalSnap.docs.map((doc) => ({
+        const palavrasCollection = collection(db, "decks", themeId, "palavras");
+        const q = query(palavrasCollection);
+        const snapshot = await getDocs(q);
+
+        const listaDePalavras = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        const progressoRef = collection(
-          db,
-          "usuarios",
-          userId,
-          "progressoPalavras"
-        );
-        const progressoSnap = await getDocs(progressoRef);
-        const progressoMap = new Map();
-        progressoSnap.forEach((doc) => {
-          progressoMap.set(doc.id, doc.data());
-        });
-
-        const hoje = new Date();
-        let palavrasNovas = [];
-        let palavrasParaRevisar = [];
-
-        for (const palavra of deckPessoal) {
-          const progresso = progressoMap.get(palavra.id);
-          if (!progresso) {
-            palavrasNovas.push(palavra);
-          } else if (progresso.proximaRevisao.toDate() <= hoje) {
-            palavrasParaRevisar.push({ ...palavra, progresso });
-          }
-        }
-
-        const NOVAS_POR_DIA = 5;
-        let deckFinal = [
-          ...shuffleArray(palavrasParaRevisar),
-          ...shuffleArray(palavrasNovas).slice(0, NOVAS_POR_DIA),
-        ];
-
-        if (deckFinal.length > 0) {
-          setDeck(deckFinal);
-          setStudyStatus("ready");
+        if (listaDePalavras.length === 0) {
+          setStatus("deck_empty");
         } else {
-          setStudyStatus("deck_empty");
+          setDeck(shuffleArray(listaDePalavras));
+          setStatus("ready");
         }
       } catch (erro) {
-        console.error("Erro ao carregar deck pessoal de palavras:", erro);
-        setStudyStatus("deck_empty");
+        console.error("Erro ao carregar estudo temático:", erro);
+        setStatus("deck_empty");
       }
     }
-    carregarDeckDeEstudo();
-  }, [userId]);
+    carregarEstudo();
+  }, [themeId, reloadTrigger]);
 
   useEffect(() => {
-    if (
-      studyStatus !== "ready" ||
-      deck.length === 0 ||
-      indiceAtual >= deck.length
-    )
+    if (status !== "ready" || deck.length === 0 || indiceAtual >= deck.length)
       return;
 
     setRespostaSelecionada(null);
@@ -118,29 +80,24 @@ export function EstudoPessoalPalavras() {
       novasOpcoes.push(deckFiltrado.splice(iAleatorio, 1)[0].palavra_pt);
     }
     setOpcoes(shuffleArray(novasOpcoes));
-  }, [studyStatus, deck, indiceAtual]);
+  }, [status, deck, indiceAtual]);
 
-  async function salvarProgressoSRS(acertou) {
-    if (!userId) return;
-    const palavra = deck[indiceAtual];
-    const progressoAtual = palavra.progresso || { nivel: 0 };
-    const novoNivel = calcularNovoNivel(progressoAtual.nivel, acertou);
-    const proximaRevisao = getProximaRevisao(novoNivel);
-    const docRef = doc(db, "usuarios", userId, "progressoPalavras", palavra.id);
-    try {
-      await setDoc(
-        docRef,
-        {
-          nivel: novoNivel,
-          proximaRevisao: proximaRevisao,
-          ultimoEstudo: serverTimestamp(),
-          palavra_en: palavra.palavra_en,
-        },
-        { merge: true }
-      );
-    } catch (error) {
-      console.error("Erro ao salvar progresso SRS:", error);
-    }
+  function reiniciarSessao() {
+    setDeck([]);
+    setIndiceAtual(0);
+    setOpcoes([]);
+    setRespostaSelecionada(null);
+    setAcertouSelecao(false);
+    setEscritaInput("");
+    setEscritaFeedback("neutro");
+    setAcertouEscrita(false);
+    setErrosNaPalavra(0);
+    setAcertosSessao(0);
+    setSessaoConcluida(false);
+    setVerRevisao(false);
+    setStatus("loading");
+    setModo("estudar");
+    setReloadTrigger((prev) => prev + 1);
   }
 
   function handleFalar(texto) {
@@ -177,8 +134,6 @@ export function EstudoPessoalPalavras() {
       setErrosNaPalavra(errosNaPalavra + 1);
     }
 
-    salvarProgressoSRS(acertou);
-
     if (indiceAtual + 1 === deck.length) {
       setSessaoConcluida(true);
     }
@@ -196,20 +151,20 @@ export function EstudoPessoalPalavras() {
     }
   }
 
-  if (studyStatus === "loading") {
-    return <p className="text-2xl text-white">Carregando deck pessoal...</p>;
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center">
+        <p className="text-2xl text-white">Carregando deck...</p>
+      </div>
+    );
   }
 
-  if (studyStatus === "deck_empty") {
+  if (status === "deck_empty") {
     return (
-      <div className="w-full max-w-md text-center text-white">
-        <div className="rounded-lg bg-zinc-800 p-8 shadow-lg">
-          <h2 className="text-3xl font-bold text-sky-500">Deck Vazio</h2>
-          <p className="mt-4 text-xl text-zinc-300">
-            Você não tem palavras novas ou revisões para hoje.
-          </p>
-          <p className="mt-2 text-zinc-400">
-            Use "Adicionar Palavra" para começar!
+      <div className="flex items-center justify-center text-center">
+        <div>
+          <p className="text-2xl text-red-500">
+            Nenhuma palavra encontrada neste deck.
           </p>
         </div>
       </div>
@@ -220,30 +175,75 @@ export function EstudoPessoalPalavras() {
     return (
       <div className="w-full max-w-md text-center text-white">
         <div className="rounded-lg bg-zinc-800 p-8 shadow-lg">
-          <h2 className="text-3xl font-bold text-emerald-500">Parabéns!</h2>
-          <p className="mt-4 text-xl text-zinc-300">
-            Sessão de revisão concluída.
-          </p>
-          <div className="mt-6 text-lg">
-            Acertos de Primeira:{" "}
-            <span className="text-2xl font-bold text-emerald-400">
-              {acertosSessao}
-            </span>
-            {" / "}
-            <span className="text-2xl font-bold">{deck.length}</span>
-          </div>
+          {verRevisao ? (
+            <div>
+              <h2 className="text-2xl font-bold text-emerald-500">
+                Revisão da Sessão
+              </h2>
+              <ul className="mt-4 max-h-60 overflow-y-auto text-left divide-y divide-zinc-700">
+                {deck.map((palavra) => (
+                  <li key={palavra.id} className="py-2">
+                    <span className="font-bold text-white">
+                      {palavra.palavra_en}
+                    </span>
+                    <span className="text-zinc-400">
+                      : {palavra.palavra_pt}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => setVerRevisao(false)}
+                className="mt-6 w-full rounded-lg bg-zinc-700 px-6 py-3 text-lg text-white transition-colors hover:bg-zinc-600"
+              >
+                Voltar
+              </button>
+            </div>
+          ) : (
+            <div>
+              <h2 className="text-3xl font-bold text-emerald-500">Parabéns!</h2>
+              <p className="mt-4 text-xl text-zinc-300">
+                Você concluiu este deck temático!
+              </p>
+              <div className="mt-6 text-lg">
+                Acertos de Primeira:{" "}
+                <span className="text-2xl font-bold text-emerald-400">
+                  {acertosSessao}
+                </span>
+                {" / "}
+                <span className="text-2xl font-bold">{deck.length}</span>
+              </div>
+              <p className="mt-2 text-zinc-400">
+                Você pode estudar este deck novamente quando quiser.
+              </p>
+              <div className="mt-6 space-y-3">
+                <button
+                  onClick={() => setVerRevisao(true)}
+                  className="w-full rounded-lg bg-sky-600 px-6 py-3 text-lg text-white transition-colors hover:bg-sky-500"
+                >
+                  Ver Revisão
+                </button>
+                <button
+                  onClick={reiniciarSessao}
+                  className="w-full rounded-lg bg-emerald-600 px-6 py-3 text-lg text-white transition-colors hover:bg-emerald-500"
+                >
+                  Estudar Novamente
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  if (studyStatus === "ready") {
+  if (status === "ready") {
     if (modo === "estudar") {
       return (
         <div className="w-full max-w-md text-center text-white animate-fadeIn">
           <div className="rounded-lg bg-zinc-800 p-8 shadow-lg">
-            <h2 className="text-2xl font-bold text-sky-500">
-              Estudar Meu Deck
+            <h2 className="text-2xl font-bold text-orange-400">
+              Estudar Deck Temático
             </h2>
             <p className="mt-2 text-zinc-400">
               Memorize a lista abaixo antes de começar o teste.
@@ -274,16 +274,15 @@ export function EstudoPessoalPalavras() {
     let corBordaInput = "border-zinc-700 focus:border-emerald-500";
     if (escritaFeedback === "correto") corBordaInput = "border-emerald-500";
     else if (escritaFeedback === "incorreto") corBordaInput = "border-red-500";
-
     return (
       <div className="w-full max-w-md ">
-        {/* Card Principal */}
         <div className="relative rounded-lg bg-zinc-800 p-6 shadow-lg">
           <button
             onClick={() => handleFalar(palavraAtual.palavra_en)}
             className="absolute top-4 right-4 text-zinc-400 hover:text-emerald-500 transition-colors"
             title="Ouvir pronúncia"
           >
+            {/* SVG do som */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -306,7 +305,6 @@ export function EstudoPessoalPalavras() {
             Qual a tradução correta?
           </p>
         </div>
-        {/* Etapa 1: Múltipla Escolha */}
         <div className="mt-6 grid grid-cols-1 gap-4">
           {opcoes.map((opcao, index) => {
             let corBotao =
@@ -333,7 +331,6 @@ export function EstudoPessoalPalavras() {
             );
           })}
         </div>
-        {/* Etapa 2: Escrita */}
         {acertouSelecao && (
           <div className="mt-6 animate-fadeIn rounded-lg bg-zinc-800 p-6 shadow-lg">
             <p className="mb-3 text-lg text-zinc-300">
@@ -359,7 +356,6 @@ export function EstudoPessoalPalavras() {
             </div>
           </div>
         )}
-        {/* Navegação */}
         <div className="mt-6 flex justify-between">
           <button
             onClick={irParaAnterior}
@@ -382,5 +378,6 @@ export function EstudoPessoalPalavras() {
       </div>
     );
   }
+
   return null;
 }

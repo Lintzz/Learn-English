@@ -24,6 +24,15 @@ export function DiariasPage() {
         </Link>
 
         <Link
+          to="/progresso"
+          className="block w-full rounded-lg bg-zinc-800 p-6 text-center transition-colors hover:bg-zinc-700"
+        >
+          <h2 className="text-2xl font-bold text-yellow-500">
+            Ver Meu Progresso Diário
+          </h2>
+        </Link>
+
+        <Link
           to="/"
           className="mt-4 text-center text-lg text-zinc-400 hover:text-white"
         >
